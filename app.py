@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import gradio as gr
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -16,6 +18,7 @@ class IngestRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     question: str
+    history: list[dict[str, Any]] | None = None
 
 
 def handle_ingest(path: str) -> str:
@@ -29,6 +32,18 @@ def handle_ingest(path: str) -> str:
     return f"Ingested {chunk_count} chunks from {path}"
 
 
+def _matches_to_rows(result: dict) -> list[list[str]]:
+    matches = []
+    for item in result["matches"]:
+        source = item["metadata"].get("filename", "unknown")
+        score = item.get("rerank_score")
+        if score is None:
+            score = item.get("vector_score")
+        snippet = item["text"][:220].replace("\n", " ").strip()
+        matches.append([source, f"{score:.4f}", snippet])
+    return matches
+
+
 def handle_query(question: str) -> tuple[str, list[list[str]]]:
     if not question.strip():
         return "Ask a question about the indexed water management handbook.", []
@@ -38,16 +53,35 @@ def handle_query(question: str) -> tuple[str, list[list[str]]]:
     except Exception as exc:
         return f"Query failed: {exc}", []
 
-    matches = []
-    for item in result["matches"]:
-        source = item["metadata"].get("filename", "unknown")
-        score = item.get("rerank_score")
-        if score is None:
-            score = item.get("vector_score")
-        snippet = item["text"][:220].replace("\n", " ").strip()
-        matches.append([source, f"{score:.4f}", snippet])
+    return result["answer"], _matches_to_rows(result)
 
-    return result["answer"], matches
+
+def handle_chat(
+    message: str,
+    history: list[dict[str, str]] | None,
+) -> tuple[list[dict[str, str]], list[list[str]], str]:
+    if not message.strip():
+        empty_history = history or []
+        return empty_history, [], ""
+
+    chat_history = list(history or [])
+    prior_history = list(chat_history)
+
+    try:
+        result = service.answer(message, history=prior_history)
+        answer = result["answer"]
+        matches = _matches_to_rows(result)
+    except Exception as exc:
+        answer = f"Query failed: {exc}"
+        matches = []
+
+    chat_history.append({"role": "user", "content": message})
+    chat_history.append({"role": "assistant", "content": answer})
+    return chat_history, matches, ""
+
+
+def clear_chat() -> tuple[list[dict[str, str]], list[list[str]], str]:
+    return [], [], ""
 
 
 def build_interface() -> gr.Blocks:
@@ -295,28 +329,31 @@ def build_interface() -> gr.Blocks:
                     gr.HTML(
                         """
                         <div class="section-copy">
-                          <h2>Water Handbook Search</h2>
+                          <h2>Water Handbook Chat</h2>
                           <p>
-                            Try questions about pumping cost formulas, irrigation terms,
-                            water delivery guidance, or any section from the indexed manual.
+                            Ask follow-up questions naturally. The assistant keeps recent
+                            conversation in memory so you can say things like "explain that"
+                            or "compare it with diesel pumping cost."
                           </p>
                         </div>
                         """
                     )
+                    chat_history = gr.State([])
+                    chatbot = gr.Chatbot(
+                        label="Conversation",
+                        type="messages",
+                        height=520,
+                        elem_classes=["result-panel"],
+                    )
                     question = gr.Textbox(
-                        label="Question",
+                        label="Message",
                         placeholder="Example: What is the formula for unit pumping cost for electric-powered pumping plants?",
                         lines=2,
                     )
-                    ask_button = gr.Button("Search Handbook", elem_classes=["secondary"])
+                    with gr.Row():
+                        ask_button = gr.Button("Send Message", elem_classes=["secondary"], scale=5)
+                        clear_button = gr.Button("Clear Chat", scale=2)
                     with gr.Row(equal_height=False):
-                        answer = gr.Textbox(
-                            label="Answer",
-                            lines=8,
-                            interactive=False,
-                            elem_classes=["result-panel"],
-                            scale=7,
-                        )
                         sources = gr.Dataframe(
                             headers=["Source", "Score", "Snippet"],
                             datatype=["str", "str", "str"],
@@ -330,15 +367,37 @@ def build_interface() -> gr.Blocks:
                     gr.HTML(
                         """
                         <div class="footnote">
-                          Indexed sources appear on the right so you can verify each answer against the handbook text.
+                          Each reply is grounded in retrieved handbook text, and the latest turn's source evidence appears on the right.
                         </div>
                         """
                     )
 
             ask_button.click(
-                handle_query,
-                inputs=question,
-                outputs=[answer, sources],
+                handle_chat,
+                inputs=[question, chat_history],
+                outputs=[chatbot, sources, question],
+            ).then(
+                lambda history: history,
+                inputs=chatbot,
+                outputs=chat_history,
+            )
+
+            question.submit(
+                handle_chat,
+                inputs=[question, chat_history],
+                outputs=[chatbot, sources, question],
+            ).then(
+                lambda history: history,
+                inputs=chatbot,
+                outputs=chat_history,
+            )
+
+            clear_button.click(
+                clear_chat,
+                outputs=[chatbot, sources, question],
+            ).then(
+                lambda: [],
+                outputs=chat_history,
             )
 
     return demo
@@ -361,7 +420,7 @@ def ingest(request: IngestRequest) -> dict:
 
 @app.post("/query")
 def query(request: QueryRequest) -> dict:
-    return service.answer(request.question)
+    return service.answer(request.question, history=request.history)
 
 
 gradio_app = build_interface()

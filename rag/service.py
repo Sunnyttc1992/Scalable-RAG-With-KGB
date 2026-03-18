@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from ingestion.chunking.metadata import enrich_metadata
 from ingestion.chunking.splitter import split_text
@@ -58,10 +59,11 @@ class RAGService:
             top_k=settings.rerank_limit,
         )
 
-    def answer(self, query: str) -> dict:
-        ranked_chunks = self.retrieve(query)
+    def answer(self, query: str, history: list[dict[str, Any]] | None = None) -> dict:
+        retrieval_query = self._build_retrieval_query(query, history or [])
+        ranked_chunks = self.retrieve(retrieval_query)
         return {
-            "answer": self.generator.answer(query, ranked_chunks),
+            "answer": self.generator.answer(query, ranked_chunks, history=history),
             "matches": [
                 {
                     "id": chunk.id,
@@ -74,6 +76,31 @@ class RAGService:
             ],
         }
 
+    def _build_retrieval_query(
+        self,
+        query: str,
+        history: list[dict[str, Any]],
+    ) -> str:
+        if not history:
+            return query
+
+        recent_turns: list[str] = []
+        for item in history[-4:]:
+            role = item.get("role", "user")
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            prefix = "User" if role == "user" else "Assistant"
+            recent_turns.append(f"{prefix}: {content}")
+
+        if not recent_turns:
+            return query
+
+        return (
+            "Use the recent conversation to interpret the latest user question.\n"
+            f"Recent conversation:\n" + "\n".join(recent_turns) + f"\nLatest question: {query}"
+        )
+
     def _load_file(self, path: Path) -> tuple[str, dict]:
         raw_bytes = path.read_bytes()
         suffix = path.suffix.lower()
@@ -85,4 +112,3 @@ class RAGService:
             text = raw_bytes.decode("utf-8")
             return text, {"filename": path.name, "type": suffix.lstrip(".")}
         raise ValueError(f"Unsupported file type: {suffix}")
-
