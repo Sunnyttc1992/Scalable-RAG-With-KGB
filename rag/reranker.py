@@ -29,10 +29,41 @@ class LLMReranker:
             for index, chunk in enumerate(chunks)
         )
         prompt = (
-            "You are a retrieval reranker. Rank the passages by relevance to the user "
-            "query. Return strict JSON with a single key named ranked_passages. "
-            "Each item must include index and score, where score is 0 to 1.\n\n"
-            f"Query: {query}\n\n"
+            "You are a high-precision relevance ranking system for DC Water customer support.\n"
+            "Your task is to evaluate and rank candidate passages based strictly on their relevance "
+            "to the user query.\n\n"
+
+            "Instructions:\n"
+            "- Focus ONLY on semantic relevance to the query.\n"
+            "- Prioritize passages that directly answer or support the query.\n"
+            "- Penalize irrelevant, vague, or redundant passages.\n"
+            "- Do NOT generate explanations or additional text.\n"
+            "- Do NOT modify or rewrite passages.\n"
+            "- Only return the ranking.\n\n"
+
+            "Scoring Guidelines:\n"
+            "- Score must be a float between 0 and 1.\n"
+            "- 1.0 = highly relevant and directly answers the query\n"
+            "- 0.7–0.9 = relevant but partially complete\n"
+            "- 0.4–0.6 = loosely related\n"
+            "- 0.0–0.3 = irrelevant or off-topic\n\n"
+
+            "Output Format (STRICT JSON ONLY):\n"
+            "{\n"
+            '  "ranked_passages": [\n'
+            '    {"index": <int>, "score": <float>},\n'
+            "    ...\n"
+            "  ]\n"
+            "}\n\n"
+
+            "Rules:\n"
+            "- Do NOT include explanations, reasoning, or extra keys.\n"
+            "- Do NOT include text outside the JSON.\n"
+            "- Ensure valid JSON format.\n"
+            "- Rank ALL provided passages.\n"
+            "- Sort results in descending order of score.\n\n"
+
+            f"Query:\n{query}\n\n"
             f"Passages:\n{candidate_block}"
         )
         try:
