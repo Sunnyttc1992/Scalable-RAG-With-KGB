@@ -2,8 +2,8 @@
 import hashlib
 import datetime
 
+# Add a content hash and ingest timestamp to each chunk's metadata.
 def enrich_metadata(base_metadata: dict, content: str) -> dict:
-    """Adds hash and timestamp for deduplication and freshness tracking."""
     return {
         **base_metadata,
         "chunk_hash": hashlib.md5(content.encode('utf-8')).hexdigest(),

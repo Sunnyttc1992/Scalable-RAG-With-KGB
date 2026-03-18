@@ -1,5 +1,6 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# Break a long document into overlapping chunks for embedding and retrieval.
 def split_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50):
 
     splitter = RecursiveCharacterTextSplitter(
@@ -18,4 +19,3 @@ def split_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50):
         }
         for i, chunk in enumerate(chunks)
     ]
-

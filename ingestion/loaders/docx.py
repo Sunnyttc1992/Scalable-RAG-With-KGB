@@ -1,10 +1,7 @@
 import io
 
+# Extract text and simple metadata from a DOCX file already loaded into memory.
 def parse_docx_bytes(file_bytes: bytes, filename: str):
-    """
-    Parses a .docx file from memory bytes.
-    Extracts text, headers, and simple tables.
-    """
     import docx
 
     file_stream = io.BytesIO(file_bytes)

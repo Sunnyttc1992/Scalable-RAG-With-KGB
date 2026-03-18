@@ -9,12 +9,14 @@ from rag.types import ScoredChunk
 
 
 class LLMReranker:
+    # Create the reranker client and choose the model used for relevance scoring.
     def __init__(self, model: str | None = None):
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is required to rerank results.")
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.model = model or settings.openai_rerank_model
 
+    # Ask the LLM to score candidate passages and keep the highest-ranked ones.
     def rerank(
         self,
         query: str,

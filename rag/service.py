@@ -15,12 +15,14 @@ from rag.reranker import LLMReranker
 
 
 class RAGService:
+    # Set up the services needed to ingest files and answer questions.
     def __init__(self):
         self.embedder = OpenAIEmbedder()
         self.repository = QdrantRepository()
         self.reranker = LLMReranker()
         self.generator = AnswerGenerator()
 
+    # Read one file, split it into chunks, embed those chunks, and save them.
     def ingest_file(self, path: str | Path) -> int:
         file_path = Path(path)
         if not file_path.exists():
@@ -47,6 +49,7 @@ class RAGService:
         embeddings = self.embedder.embed_texts([chunk["text"] for chunk in prepared_chunks])
         return self.repository.upsert_chunks(prepared_chunks, embeddings)
 
+    # Find the most relevant chunks for a question and rerank the matches.
     def retrieve(self, query: str):
         query_vector = self.embedder.embed_query(query)
         retrieved = self.repository.search(
@@ -59,6 +62,7 @@ class RAGService:
             top_k=settings.rerank_limit,
         )
 
+    # Generate a grounded answer using retrieval results and recent conversation history.
     def answer(self, query: str, history: list[dict[str, Any]] | None = None) -> dict:
         retrieval_query = self._build_retrieval_query(query, history or [])
         ranked_chunks = self.retrieve(retrieval_query)
@@ -76,6 +80,7 @@ class RAGService:
             ],
         }
 
+    # Expand follow-up questions with recent chat context before searching.
     def _build_retrieval_query(
         self,
         query: str,
@@ -101,6 +106,7 @@ class RAGService:
             f"Recent conversation:\n" + "\n".join(recent_turns) + f"\nLatest question: {query}"
         )
 
+    # Parse a supported file into plain text plus file metadata.
     def _load_file(self, path: Path) -> tuple[str, dict]:
         raw_bytes = path.read_bytes()
         suffix = path.suffix.lower()

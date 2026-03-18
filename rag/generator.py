@@ -9,6 +9,7 @@ from rag.config import settings
 from rag.types import ScoredChunk
 
 
+# Clean the model output so it reads well in the chat UI.
 def _normalize_answer_text(text: str) -> str:
     cleaned = text.strip()
     cleaned = re.sub(r"\\\((.*?)\\\)", r"\1", cleaned, flags=re.DOTALL)
@@ -20,12 +21,14 @@ def _normalize_answer_text(text: str) -> str:
 
 
 class AnswerGenerator:
+    # Create the answer-generation client and choose the chat model.
     def __init__(self, model: str | None = None):
         if not settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is required to generate answers.")
         self.client = OpenAI(api_key=settings.openai_api_key)
         self.model = model or settings.openai_answer_model
 
+    # Generate a final answer from retrieved chunks and recent conversation turns.
     def answer(
         self,
         query: str,
@@ -71,6 +74,7 @@ class AnswerGenerator:
         )
         return _normalize_answer_text(response.choices[0].message.content or "")
 
+    # Convert recent chat messages into plain text for the prompt.
     def _format_history(self, history: list[dict[str, Any]]) -> str:
         if not history:
             return "No prior conversation."

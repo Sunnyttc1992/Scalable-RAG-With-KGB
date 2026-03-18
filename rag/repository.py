@@ -10,6 +10,7 @@ from rag.types import ScoredChunk
 
 
 class QdrantRepository:
+    # Connect to Qdrant and choose which collection this repository will use.
     def __init__(
         self,
         collection_name: str | None = None,
@@ -22,10 +23,12 @@ class QdrantRepository:
             api_key=api_key or settings.qdrant_api_key,
         )
 
+    # Check whether the target collection is already present in Qdrant.
     def collection_exists(self) -> bool:
         collections = self.client.get_collections().collections
         return any(collection.name == self.collection_name for collection in collections)
 
+    # Create the collection when it does not exist yet.
     def ensure_collection(self, vector_size: int) -> None:
         if self.collection_exists():
             return
@@ -38,6 +41,7 @@ class QdrantRepository:
             ),
         )
 
+    # Insert or update chunk records and their vectors in Qdrant.
     def upsert_chunks(
         self,
         chunks: list[dict],
@@ -64,6 +68,7 @@ class QdrantRepository:
         self.client.upsert(collection_name=self.collection_name, points=points)
         return len(points)
 
+    # Run a vector search and convert the raw results into ScoredChunk objects.
     def search(self, query_vector: list[float], limit: int) -> list[ScoredChunk]:
         if not self.collection_exists():
             return []
@@ -98,6 +103,7 @@ class QdrantRepository:
             )
         return chunks
 
+    # Return the total number of stored records in the current collection.
     def count(self) -> int:
         if not self.collection_exists():
             return 0

@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from rag.service import RAGService
 
 
+# Parse CLI file paths and ingest each file into the vector store.
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ingest files into Qdrant.")
     parser.add_argument("paths", nargs="+", help="Files to ingest")

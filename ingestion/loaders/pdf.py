@@ -1,9 +1,7 @@
 import io
 
+# Extract text and simple metadata from a PDF file already loaded into memory.
 def parse_pdf_bytes(file_bytes: bytes, filename: str):
-    """
-    Parses a PDF file stream using pypdf.
-    """
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(file_bytes))

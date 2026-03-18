@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from rag.service import RAGService
 
 
+# Parse one CLI question and print the answer payload as JSON.
 def main() -> None:
     parser = argparse.ArgumentParser(description="Query the RAG repository.")
     parser.add_argument("question", help="Question to ask")

@@ -9,6 +9,7 @@ from rag.service import RAGService
 service = RAGService()
 
 
+# Convert retrieved match objects into table rows for the UI.
 def _matches_to_rows(result: dict) -> list[list[str]]:
     matches = []
     for item in result["matches"]:
@@ -21,6 +22,7 @@ def _matches_to_rows(result: dict) -> list[list[str]]:
     return matches
 
 
+# Run a one-shot query and return the answer with its top source snippets.
 def handle_query(question: str) -> tuple[str, list[list[str]]]:
     if not question.strip():
         return "Ask a question about the indexed water management handbook.", []
@@ -33,6 +35,7 @@ def handle_query(question: str) -> tuple[str, list[list[str]]]:
     return result["answer"], _matches_to_rows(result)
 
 
+# Process one chat turn and preserve enough history for follow-up questions.
 def handle_chat(message, history):
     if not message.strip():
         empty_history = history or []
@@ -58,10 +61,12 @@ def handle_chat(message, history):
     return chat_history, chat_history, matches, ""
 
 
+# Reset the chat messages, stored history, source table, and input box.
 def clear_chat():
     return [], [], [], ""
 
 
+# Build the full Gradio interface for the handbook assistant.
 def build_interface() -> gr.Blocks:
     ocean_css = """
     :root {
@@ -377,6 +382,7 @@ app = demo
 
 
 if __name__ == "__main__":
+    # Start the Gradio app when running this file directly.
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", "7860")),
