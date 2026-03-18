@@ -31,7 +31,7 @@ def handle_ingest(path: str) -> str:
 
 def handle_query(question: str) -> tuple[str, list[list[str]]]:
     if not question.strip():
-        return "Ask a question to search the city grid.", []
+        return "Ask a question about the indexed water management handbook.", []
 
     try:
         result = service.answer(question)
@@ -272,19 +272,19 @@ def build_interface() -> gr.Blocks:
     with gr.Blocks(
         theme=theme,
         css=ocean_css,
-        title="Ocean Light RAG",
+        title="Water Management Handbook Assistant",
     ) as demo:
         with gr.Column(elem_classes=["app-shell"]):
             gr.HTML(
                 """
                 <section class="topbar">
-                  <div class="eyebrow">Ocean Retrieval</div>
-                  <h1>Calm, Clear Search<br/>Across Your Knowledge Base</h1>
+                  <div class="eyebrow">Water Knowledge Assistant</div>
+                  <h1>Ask The Water Management Handbook<br/>In Plain Language</h1>
                   <p>
-                    A brighter Gradio workspace for ingesting documents, asking grounded
-                    questions, and reviewing source snippets with a clean, coastal feel.
-                    Soft gradients, airy spacing, and white surfaces keep the experience
-                    easy to read from first upload to final answer.
+                    Search the indexed water management manual for equations,
+                    pumping guidance, definitions, and supporting excerpts.
+                    The interface is tuned for practical handbook lookup:
+                    ask a question, read the answer, and inspect the source text beside it.
                   </p>
                 </section>
                 """
@@ -295,16 +295,20 @@ def build_interface() -> gr.Blocks:
                     gr.HTML(
                         """
                         <div class="section-copy">
-                          <h2>Ask The Knowledge Base</h2>
+                          <h2>Water Handbook Search</h2>
+                          <p>
+                            Try questions about pumping cost formulas, irrigation terms,
+                            water delivery guidance, or any section from the indexed manual.
+                          </p>
                         </div>
                         """
                     )
                     question = gr.Textbox(
                         label="Question",
-                        placeholder="Please provide a question",
+                        placeholder="Example: What is the formula for unit pumping cost for electric-powered pumping plants?",
                         lines=2,
                     )
-                    ask_button = gr.Button("Run Query", elem_classes=["secondary"])
+                    ask_button = gr.Button("Search Handbook", elem_classes=["secondary"])
                     with gr.Row(equal_height=False):
                         answer = gr.Textbox(
                             label="Answer",
@@ -326,7 +330,7 @@ def build_interface() -> gr.Blocks:
                     gr.HTML(
                         """
                         <div class="footnote">
-                          The interface is intentionally minimal: just ingest, ask, and inspect the evidence.
+                          Indexed sources appear on the right so you can verify each answer against the handbook text.
                         </div>
                         """
                     )
