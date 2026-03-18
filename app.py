@@ -1,35 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+import os
 
 import gradio as gr
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 
 from rag.service import RAGService
 
-app = FastAPI(title="Reranker RAG with Qdrant")
 service = RAGService()
-
-
-class IngestRequest(BaseModel):
-    path: str
-
-
-class QueryRequest(BaseModel):
-    question: str
-    history: list[dict[str, Any]] | None = None
-
-
-def handle_ingest(path: str) -> str:
-    try:
-        chunk_count = service.ingest_file(path)
-    except (FileNotFoundError, ValueError) as exc:
-        return f"Ingest failed: {exc}"
-    except Exception as exc:
-        return f"Ingest failed: {exc}"
-
-    return f"Ingested {chunk_count} chunks from {path}"
 
 
 def _matches_to_rows(result: dict) -> list[list[str]]:
@@ -56,16 +33,18 @@ def handle_query(question: str) -> tuple[str, list[list[str]]]:
     return result["answer"], _matches_to_rows(result)
 
 
-def handle_chat(
-    message: str,
-    history: list[dict[str, str]] | None,
-) -> tuple[list[dict[str, str]], list[list[str]], str]:
+def handle_chat(message, history):
     if not message.strip():
         empty_history = history or []
-        return empty_history, [], ""
+        return empty_history, empty_history, [], ""
 
     chat_history = list(history or [])
-    prior_history = list(chat_history)
+    prior_history = []
+    for user_message, assistant_message in chat_history:
+        if user_message:
+            prior_history.append({"role": "user", "content": user_message})
+        if assistant_message:
+            prior_history.append({"role": "assistant", "content": assistant_message})
 
     try:
         result = service.answer(message, history=prior_history)
@@ -75,13 +54,12 @@ def handle_chat(
         answer = f"Query failed: {exc}"
         matches = []
 
-    chat_history.append({"role": "user", "content": message})
-    chat_history.append({"role": "assistant", "content": answer})
-    return chat_history, matches, ""
+    chat_history.append([message, answer])
+    return chat_history, chat_history, matches, ""
 
 
-def clear_chat() -> tuple[list[dict[str, str]], list[list[str]], str]:
-    return [], [], ""
+def clear_chat():
+    return [], [], [], ""
 
 
 def build_interface() -> gr.Blocks:
@@ -341,7 +319,6 @@ def build_interface() -> gr.Blocks:
                     chat_history = gr.State([])
                     chatbot = gr.Chatbot(
                         label="Conversation",
-                        type="messages",
                         height=520,
                         elem_classes=["result-panel"],
                     )
@@ -375,53 +352,32 @@ def build_interface() -> gr.Blocks:
             ask_button.click(
                 handle_chat,
                 inputs=[question, chat_history],
-                outputs=[chatbot, sources, question],
-            ).then(
-                lambda history: history,
-                inputs=chatbot,
-                outputs=chat_history,
+                outputs=[chatbot, chat_history, sources, question],
+                api_name=False,
             )
 
             question.submit(
                 handle_chat,
                 inputs=[question, chat_history],
-                outputs=[chatbot, sources, question],
-            ).then(
-                lambda history: history,
-                inputs=chatbot,
-                outputs=chat_history,
+                outputs=[chatbot, chat_history, sources, question],
+                api_name=False,
             )
 
             clear_button.click(
                 clear_chat,
-                outputs=[chatbot, sources, question],
-            ).then(
-                lambda: [],
-                outputs=chat_history,
+                outputs=[chatbot, chat_history, sources, question],
+                api_name=False,
             )
 
     return demo
 
 
-@app.get("/health")
-def health() -> dict:
-    return {"status": "ok", "indexed_documents": service.repository.count()}
+demo = build_interface()
+app = demo
 
 
-@app.post("/ingest")
-def ingest(request: IngestRequest) -> dict:
-    try:
-        chunk_count = service.ingest_file(request.path)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return {"path": request.path, "chunks_ingested": chunk_count}
-
-
-@app.post("/query")
-def query(request: QueryRequest) -> dict:
-    return service.answer(request.question, history=request.history)
-
-
-gradio_app = build_interface()
-app = gr.mount_gradio_app(app, gradio_app, path="/")
+if __name__ == "__main__":
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.getenv("PORT", "7860")),
+    )
